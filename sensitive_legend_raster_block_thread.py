@@ -1,5 +1,3 @@
-from osgeo import gdal
-
 from PyQt4.QtCore import QObject, pyqtSignal, pyqtSlot, QThread
 from PyQt4.QtGui import QMessageBox
 

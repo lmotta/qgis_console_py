@@ -6,16 +6,15 @@ class ToggleLegendRaster(QObject):
   def __init__(self, layer, tvLegend):
     def initLegendToggle():
       legendColorAll = layer.legendSymbologyItems()
-      legendAll = map( lambda x: x[0], legendColorAll )
-      keysLegend = range( len(legendAll) )
-      self.legendToggle = dict( ( x, True ) for x in keysLegend )
+      self.legendAll = map( lambda x: x[0], legendColorAll )
+      self.legendToggle = dict( ( x, True ) for x in self.legendAll )
 
     super(ToggleLegendRaster, self).__init__() # QThread
     #
     self.layer = layer
     self.tvLegend = tvLegend
     self.transparency = layer.renderer().rasterTransparency()
-    self.legendToggle = {}
+    self.legendToggle = self.legendAll = None
     initLegendToggle()
     #
     self.tvLegend.activated.connect( self.toggle )
@@ -29,26 +28,26 @@ class ToggleLegendRaster(QObject):
     else:
       layer.triggerRepaint()
 
-  def setAllVisible(self):
-    for item in self.legendToggle.keys():
-      self.legendToggle[ item ] = True
-
   @pyqtSlot('QModelIndex')
   def toggle(self, index ):
-    def setShow(id, show):
+    def setShow(legend, show):
+      value = self.legendAll.index( legend )
       t = QgsRasterTransparency.TransparentSingleValuePixel()
-      t.min = t.max = id
+      t.min = t.max = value
       t.percentTransparent = 100.0 if not show else 0.0
 
       return t
     
-    if not index.parent().data() == self.layer.name():
+    layer = self.layer.name()
+    parent = index.parent().data()
+    data = index.data()
+    if data == layer:
       self.showAll()
       return
+    elif not parent == layer:
+      return
 
-    id = index.row()
-
-    self.legendToggle[id] = not self.legendToggle[id]
+    self.legendToggle[ data ] = not self.legendToggle[ data ]
     values = map( lambda x: setShow( x, self.legendToggle[ x ] ), self.legendToggle.keys() )
     self.transparency.setTransparentSingleValuePixelList( values )
     self.refreshLayer()
@@ -58,7 +57,9 @@ class ToggleLegendRaster(QObject):
   def showAll(self):
     self.transparency.setTransparentSingleValuePixelList([])
     self.refreshLayer()
-    self.setAllVisible()
+    #
+    for item in self.legendToggle.keys():
+      self.legendToggle[ item ] = True
 
 # Main
 layer = iface.activeLayer()
@@ -66,5 +67,7 @@ tvLegend = qgis.utils.iface.layerTreeView()
 #
 if layer is None:
   print "Select layer"
-t = ToggleLegendRaster( layer, tvLegend )
+else:
+  t = ToggleLegendRaster( layer, tvLegend )
+
 # del t

@@ -69,7 +69,8 @@ class TreeLegendCRS(QObject):
       return item
 
     for crs, layers in getCrs_Layers().iteritems():
-      itemCRS = createItem( crs )
+      name = "%s (%d)" % ( crs, len( layers ) )
+      itemCRS = createItem( name )
       self.model.appendRow( itemCRS ) 
       for layer in layers:
         itemLayer = createItem( layer )

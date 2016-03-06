@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 /***************************************************************************
-Name                 : Raster legend sensitive
-Description          : Testing sensitive legend.
+Name                 : Legend Coordinate Reference Systems
+Description          : Show in TreeView CRS of layers
 Date                 : March, 2016
 copyright            : (C) 2016 by Luiz Motta
 email                : motta.luiz@gmail.com
@@ -22,7 +22,7 @@ email                : motta.luiz@gmail.com
 from PyQt4.QtCore import QObject, pyqtSlot, Qt
 from PyQt4.QtGui import QDockWidget, QTreeView, QStandardItemModel, QStandardItem
 
-from qgis.core import QgsMapLayer
+from qgis.core import QgsMapLayer, QgsMapLayerRegistry
 
 
 class TreeLegendCRS(QObject):
@@ -37,14 +37,37 @@ class TreeLegendCRS(QObject):
     self.tree.setModel( self.model )
     self.tree.setSelectionMode( 0 ) # no selection
     self.tree.setHeaderHidden( True )
-    self.tree.clicked.connect( self.setCurrentLayer )
+    #
+    self.dock = QDockWidget( "CRS of Layers", iface.mainWindow() )
+    self.dock.setWidget( self.tree )
+    #
+    self._connect()
 
   def __del__(self):
-    self.tree.clicked.disconnect( self.setCurrentLayer )
     self.model.clear()
+    self._connect( False )
+
+  def _connect(self, isConnect = True):
+    ss = [
+      { 'signal': self.tree.clicked, 'slot': self.setCurrentLayer },
+      { 'signal': QgsMapLayerRegistry.instance().legendLayersAdded, 'slot': self.updateLegend },
+      { 'signal': QgsMapLayerRegistry.instance().layersRemoved, 'slot': self.updateLegend }
+    ]
+    if isConnect:
+      self.hasConnect = True
+      for item in ss:
+        item['signal'].connect( item['slot'] )  
+    else:
+      self.hasConnect = False
+      for item in ss:
+        item['signal'].disconnect( item['slot'] )
 
   def addLegend(self):
+    self.updateLegend()
+    self.iface.addDockWidget( Qt.LeftDockWidgetArea , self.dock )
 
+  @pyqtSlot(list)
+  def updateLegend(self, lst=None):
     def getCrs_Layers():
       layers = self.iface.legendInterface().layers()
       crs_layers = {}
@@ -68,6 +91,7 @@ class TreeLegendCRS(QObject):
 
       return item
 
+    self.model.clear()
     for crs, layers in getCrs_Layers().iteritems():
       name = "%s (%d)" % ( crs, len( layers ) )
       itemCRS = createItem( name )
@@ -76,16 +100,19 @@ class TreeLegendCRS(QObject):
         itemLayer = createItem( layer )
         itemCRS.appendRow( itemLayer )
 
-    dock = QDockWidget( "CRS of Layers", iface.mainWindow() )
-    dock.setWidget( self.tree )
-    self.iface.addDockWidget( Qt.LeftDockWidgetArea , dock )
-
   @pyqtSlot('QModelIndex')
   def setCurrentLayer(self, index):
     data = index.data( Qt.UserRole )
     if not data is None:
       self.iface.setActiveLayer( data )
 
+def initTreeLegendCRS():
+  tl = TreeLegendCRS( iface )
+  tl.addLegend()
+  return tl
 
-tl = TreeLegendCRS( iface )
-tl.addLegend()
+try:
+  if not tl.dock.isVisible():
+    tl.dock.show()
+except NameError:
+  tl = initTreeLegendCRS()

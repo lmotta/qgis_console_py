@@ -1,0 +1,6 @@
+ 
+# Ignore
+.directory
+*.pyc
+*.zip
+*.sh
